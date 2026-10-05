@@ -1,10 +1,10 @@
 # GWC-Movie-Comparisons
-##About the Project
+## About the Project
 
 This is a project I made during GWC during summer pathways. It uses a Rotten Tomatoes movies dataset to compare a user's favorite movie to other movies in the same genre.
 It asks the user for their favorite movie and then one of its genres. It then gives information about the movie and compares its audience rating to other movies in that genre.
 
-##The program:
+## The program:
 
 - Finds information about your favorite movie
 - Shows its release year, critic rating, audience rating, and genre
@@ -15,10 +15,10 @@ It asks the user for their favorite movie and then one of its genres. It then gi
 - Creates a scatter plot comparing audience ratings and critic ratings
 - Calculates the correlation between audience and critic ratings
 
-##Technology Used
+## Technology Used
 Python, Pandas, Matplotlib, CSV data
 
-##How to Run
+## How to Run
 1. Download or clone this repository.
 2. Make sure Python is installed.
 3. Install Pandas and Matplotlib if you don't already have them.
@@ -27,7 +27,7 @@ Python, Pandas, Matplotlib, CSV data
 6. Choose one of the movie's genres to see the comparisons and graphs.
 
 
-##Project Files
+## Project Files
 - main.py - The main Python program
 - rotten_tomatoes_movies.csv - The movie dataset
 - README.md - Information about the project
