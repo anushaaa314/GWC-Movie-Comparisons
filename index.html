@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Movie Comparisons</title>
+</head>
+<body>
+  <h1>Movie Comparisons</h1>
+  <p>Compare your favorite movie with other movies in one of its genres.</p>
+
+  <form id="movie-form">
+    <label for="movie">What is your favorite movie (before 2020)?</label><br>
+    <input id="movie" name="movie" type="text" required>
+    <br><br>
+    <label for="genre">Which genre would you like to analyze?</label><br>
+    <input id="genre" name="genre" type="text" required>
+    <br><br>
+    <button type="submit">Compare movies</button>
+  </form>
+
+  <p id="status" role="status"></p>
+  <section id="results" hidden>
+    <h2 id="movie-heading"></h2>
+    <p id="movie-details"></p>
+    <h2 id="genre-heading"></h2>
+    <div id="statistics"></div>
+    <h2>Audience Ratings Histogram</h2>
+    <p id="histogram-interpretation"></p>
+    <img id="histogram" alt="Histogram of audience ratings for the selected genre">
+    <h2>Audience Rating vs. Critic Rating</h2>
+    <p id="correlation"></p>
+    <img id="scatterplot" alt="Scatter plot comparing audience ratings and critic ratings">
+    <p>Thank you for reading through my data analysis!</p>
+  </section>
+
+  <script>
+    const form = document.getElementById("movie-form");
+    const status = document.getElementById("status");
+    const results = document.getElementById("results");
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      status.textContent = "Analyzing movies...";
+      results.hidden = true;
+
+      try {
+        const response = await fetch("/api/analyze", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            movie: document.getElementById("movie").value.trim(),
+            genre: document.getElementById("genre").value.trim()
+          })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "The analysis could not be completed.");
+
+        document.getElementById("movie-heading").textContent = data.movie.title;
+        document.getElementById("movie-details").textContent =
+          `Released: ${data.movie.year} | Critic rating: ${data.movie.critic_rating} | Audience rating: ${data.movie.audience_rating} | Genres: ${data.movie.genres}`;
+        document.getElementById("genre-heading").textContent =
+          `Genre: ${data.genre} (${data.movie_count} movies)`;
+        document.getElementById("statistics").replaceChildren();
+        data.statistics.forEach((line) => {
+          const p = document.createElement("p");
+          p.textContent = line;
+          document.getElementById("statistics").appendChild(p);
+        });
+        document.getElementById("histogram-interpretation").textContent = data.histogram_interpretation;
+        document.getElementById("histogram").src = `data:image/png;base64,${data.histogram_image}`;
+        document.getElementById("correlation").textContent = data.correlation_interpretation;
+        document.getElementById("scatterplot").src = `data:image/png;base64,${data.scatterplot_image}`;
+        results.hidden = false;
+        status.textContent = "";
+      } catch (error) {
+        status.textContent = error.message;
+      }
+    });
+  </script>
+</body>
+</html>

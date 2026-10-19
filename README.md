@@ -1,33 +1,26 @@
-# GWC-Movie-Comparisons
-## About the Project
+# Movie Comparisons (Vercel)
 
-This is a project I made during GWC during summer pathways. It uses a Rotten Tomatoes movies dataset to compare a user's favorite movie to other movies in the same genre.
-It asks the user for their favorite movie and then one of its genres. It then gives information about the movie and compares its audience rating to other movies in that genre.
+This is a minimal web version of the original terminal-based movie analysis program.
 
-## The program:
+## Files
 
-- Finds information about your favorite movie
-- Shows its release year, critic rating, audience rating, and genre
-- Finds other movies in the same genre
-- Calculates the minimum, maximum, mean, and median audience ratings
-- Compares your movie's rating to these numbers
-- Creates a histogram showing the audience ratings of movies in the genre
-- Creates a scatter plot comparing audience ratings and critic ratings
-- Calculates the correlation between audience and critic ratings
+- `index.html` — simple web form and results page
+- `api/analyze.py` — Python API that runs the analysis and creates the two plots
+- `rotten_tomatoes_movies.csv` — your original dataset (must be in the repository root)
+- `requirements.txt` — Python dependencies
+- `vercel.json` — includes the CSV in the deployed Python function
 
-## Technology Used
-Python, Pandas, Matplotlib, CSV data
+## Deploy
 
-## How to Run
-1. Download or clone this repository.
-2. Make sure Python is installed.
-3. Install Pandas and Matplotlib if you don't already have them.
-4. Run main.py.
-5. Enter a movie from the dataset when the program asks for your favorite movie.
-6. Choose one of the movie's genres to see the comparisons and graphs.
+1. Copy these files into the root of your GitHub repository.
+2. Make sure `rotten_tomatoes_movies.csv` is in the same root folder as `index.html`.
+3. Commit and push the changes to GitHub.
+4. In Vercel, import the GitHub repository and deploy it.
+5. After deployment, enter a movie title exactly as it appears in the dataset, then enter a genre such as `Comedy` or `Drama`.
 
+## Notes
 
-## Project Files
-- main.py - The main Python program
-- rotten_tomatoes_movies.csv - The movie dataset
-- README.md - Information about the project
+- This keeps the original dataset-driven analysis and both visualizations.
+- The movie title is matched without case sensitivity, but spelling should match the dataset.
+- The genre search is case-insensitive and treats the genre as literal text.
+- Test with a small sample locally before deploying if you change the dataset.
