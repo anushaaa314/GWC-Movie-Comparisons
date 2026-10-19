@@ -175,7 +175,7 @@ class handler(BaseHTTPRequestHandler):
         except Exception:
             self.send_json(500, {"error": "An unexpected error occurred while analyzing the data."})
 
-def do_GET(self):
+    def do_GET(self):
     request_path = urlparse(self.path)
 
     if request_path.path == "/api/movies":
