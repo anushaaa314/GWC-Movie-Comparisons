@@ -1,131 +1,196 @@
-#Talking Data Starter Code
-
-#Part 2 Setting up the program
+import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+from pathlib import Path
 
-pd.set_option('display.max_columns', None)
-pd.set_option('max_colwidth', None)
-
-movieData = pd.read_csv('./rotten_tomatoes_movies.csv')
-favMovie = input("What is your favorite movie (before 2020)?: ")
-
-favBoolList = movieData["movie_title"] == favMovie
-favData = movieData.loc[favBoolList].iloc[0]
-print("Your movie was released in:", favData["year"])
-print("The critic rating is:", favData["critic_rating"])
-print("The audience rating is:", favData["audience_rating"])
-print("The genre(s) is/are:", favData["genres"])
-
-
-print("\n\n")
-
-choosenGenre = input("Which of the movie's genres would you like to analyze?")
-genreBoolList = movieData["genres"].str.contains(choosenGenre)
-genreMovieData = movieData.loc[genreBoolList]
-numOfMovies = genreMovieData.shape[0]
-
-print("There are " + str(numOfMovies) + " movies under the category " + choosenGenre + ".")
-
-print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n")
-input("Press enter to see more information about how " + favMovie +
-      " compares to other movies in this genre.")
-
-#Part 5 Describe data
-#find min
-min = min(genreMovieData["audience_rating"])
-print("The min audience rating of the data set is: " + str(min))
-print(favMovie + " is rated " + (str(favData["audience_rating"]-min)) + " points higher than the lowest rated movie.")
-print()
-
-#find max
-max = max(genreMovieData["audience_rating"])
-print("The max audience rating of the data set is: " + str(max))
-print(favMovie + " is rated " + (str(max-favData["audience_rating"])) + " points lower than the highest rated movie.")
-print()
-
-#find mean
-mean = genreMovieData["audience_rating"].mean()
-mean = round(mean, 1)
-print("The mean audience rating of the data set is: " + str(mean))
-if favData["audience_rating"] > mean:
-    print(favMovie + " is rated " + str(round(favData["audience_rating"]-mean, 2)) +" higher the mean movie rating.")
-elif mean > favData["audience_rating"]:
-    print(favMovie + " is rated " + str(round(mean-favData["audience_rating"], 2)) + " lower the mean movie rating.")
-else:
-    print("The rating and mean are equal")
-print()
-
-#find median
-median = genreMovieData["audience_rating"].median()
-print("The median audience rating of the data set is: " + str(median))
-if favData["audience_rating"] > median:
-    print(favMovie + " is rated " + (str(favData["audience_rating"]-median)) +" higher the median movie rating.")
-elif median > favData["audience_rating"]:
-    print(favMovie + " is rated " + (str(median-favData["audience_rating"])) + " lower the median movie rating.")
-else:
-    print("The rating and median are equal")
-print()
-
-print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n")
-input("Press enter to see data visualizations.")
-
-#Part 6 Create graphs
-#Create histogram
-plt.figure()
-counts, bins, patches = plt.hist(
-    genreMovieData["audience_rating"],
-    bins=20,
-    range=(0, 100)
+st.set_page_config(
+    page_title="Movie Comparisons",
+    page_icon="🎬",
+    layout="wide"
 )
-#Adds labels and adjusts histogram
-plt.grid(True)
-plt.title("Audience Ratings of "+ choosenGenre + " Movies")
-plt.xlabel("Audience Ratings")
-plt.ylabel("Number of "+ choosenGenre + " Movies")
 
-max_index = counts.argmax()
-bin_start = bins[max_index]
-bin_end = bins[max_index + 1]
+# Load your existing dataset
+data_path = Path(__file__).parent / "rotten_tomatoes_movies.csv"
+movieData = pd.read_csv(data_path)
 
-#Prints interpretation of histogram
-print("According to the histogram, most movies in this genre fall between a rating of " +
-    str(int(bin_start))+ "–" + str(int(bin_end)))
-print()
-
-#Show histogram
-plt.show()
-input("Press enter to see the next data visualization.")
-
-#Create scatterplot
-plt.figure()
-plt.scatter(data = genreMovieData, x = "audience_rating", y = "critic_rating")
-
-#Adds labels and adjusts scatterplot
-plt.grid(True)
-plt.title("Audience Rating vs. Critic Rating")
-plt.xlabel("Audience Rating")
-plt.ylabel("Critic Rating")
-plt.xlim(0, 100)
-plt.ylim(0, 100)
-
-corr = genreMovieData["audience_rating"].corr(
-    genreMovieData["critic_rating"]
+# Prepare the columns used for analysis
+movieData["year"] = pd.to_numeric(movieData["year"], errors="coerce")
+movieData["audience_rating"] = pd.to_numeric(
+    movieData["audience_rating"], errors="coerce"
 )
-corr = round(corr, 2)
-if corr > 0.3:
-    relationship = "a positive"
-elif corr < -0.3:
-    relationship = "a negative"
+movieData["critic_rating"] = pd.to_numeric(
+    movieData["critic_rating"], errors="coerce"
+)
+
+movieData = movieData.dropna(
+    subset=["movie_title", "year", "genres",
+            "audience_rating", "critic_rating"]
+)
+
+st.title("🎬 Movie Comparisons")
+st.write(
+    "Explore how your favorite movie compares with other "
+    "movies in its genre using Rotten Tomatoes ratings."
+)
+
+# Select a favorite movie released before 2020
+eligible = movieData[movieData["year"] < 2020]
+
+if eligible.empty:
+    st.error("No eligible movies were found in the dataset.")
+    st.stop()
+
+titles = sorted(eligible["movie_title"].unique())
+
+favMovie = st.selectbox(
+    "What is your favorite movie (released before 2020)?",
+    titles
+)
+
+favData = eligible[eligible["movie_title"] == favMovie].iloc[0]
+
+# Display movie information
+st.subheader(f"About {favMovie}")
+
+c1, c2, c3 = st.columns(3)
+c1.metric("Release Year", int(favData["year"]))
+c2.metric("Critic Rating", f'{favData["critic_rating"]:.1f}%')
+c3.metric("Audience Rating", f'{favData["audience_rating"]:.1f}%')
+
+st.write("**Genres:**", favData["genres"])
+
+# Let the user select one of the movie's genres
+genres = sorted({
+    genre.strip()
+    for genre in str(favData["genres"]).split(",")
+    if genre.strip()
+})
+
+if not genres:
+    st.warning("No genres are available for this movie.")
+    st.stop()
+
+chosenGenre = st.selectbox(
+    "Which genre would you like to analyze?",
+    genres
+)
+
+# Match the selected genre as a complete genre name
+genreMovieData = eligible[
+    eligible["genres"].apply(
+        lambda value: chosenGenre in [
+            genre.strip() for genre in str(value).split(",")
+        ]
+    )
+].copy()
+
+ratings = genreMovieData["audience_rating"]
+favoriteRating = float(favData["audience_rating"])
+
+st.divider()
+st.header(f"How {favMovie} compares with {chosenGenre} movies")
+st.write(f"**{len(genreMovieData)} movies** belong to this genre.")
+
+# Summary statistics
+minimum = ratings.min()
+maximum = ratings.max()
+mean = ratings.mean()
+median = ratings.median()
+
+a, b, c, d = st.columns(4)
+a.metric("Lowest Rating", f"{minimum:.1f}%")
+b.metric("Highest Rating", f"{maximum:.1f}%")
+c.metric("Average Rating", f"{mean:.1f}%")
+d.metric("Median Rating", f"{median:.1f}%")
+
+st.subheader("Your movie vs. the genre")
+
+st.write(
+    f"Your movie is **{abs(favoriteRating - minimum):.1f} points** "
+    "above the lowest audience rating."
+)
+st.write(
+    f"Your movie is **{abs(maximum - favoriteRating):.1f} points** "
+    "below the highest audience rating."
+)
+
+difference = favoriteRating - mean
+if difference > 0:
+    st.write(f"Your movie is {difference:.1f} points above the genre average.")
+elif difference < 0:
+    st.write(f"Your movie is {abs(difference):.1f} points below the genre average.")
 else:
-    relationship = "no"
+    st.write("Your movie matches the genre average.")
 
-#Prints interpretation of scatterplot
-print("According to the scatter plot, there is " + relationship + " correlation between audience ratings and critic ratings (correlation = " + str(corr) + ").")
-print()
+difference = favoriteRating - median
+if difference > 0:
+    st.write(f"Your movie is {difference:.1f} points above the genre median.")
+elif difference < 0:
+    st.write(f"Your movie is {abs(difference):.1f} points below the genre median.")
+else:
+    st.write("Your movie matches the genre median.")
 
+# Visualizations
+st.divider()
+st.header("Explore the data")
 
-#Show scatterplot
-plt.show()
+left, right = st.columns(2)
 
-print("\nThank you for reading through my data analysis!")
+with left:
+    st.subheader("Audience Rating Distribution")
+
+    fig1, ax1 = plt.subplots()
+    counts, bins, _ = ax1.hist(
+        ratings, bins=20, range=(0, 100), edgecolor="black"
+    )
+    ax1.set_title(f"Audience Ratings of {chosenGenre} Movies")
+    ax1.set_xlabel("Audience Rating")
+    ax1.set_ylabel("Number of Movies")
+    ax1.grid(True, alpha=0.3)
+    st.pyplot(fig1)
+    plt.close(fig1)
+
+    if len(counts) and counts.max() > 0:
+        index = counts.argmax()
+        st.write(
+            f"Most movies fall in the rating range "
+            f"{bins[index]:.0f}–{bins[index + 1]:.0f}."
+        )
+
+with right:
+    st.subheader("Critic Ratings vs. Audience Ratings")
+
+    fig2, ax2 = plt.subplots()
+    ax2.scatter(
+        genreMovieData["audience_rating"],
+        genreMovieData["critic_rating"],
+        alpha=0.5
+    )
+    ax2.set_title("Audience Rating vs. Critic Rating")
+    ax2.set_xlabel("Audience Rating")
+    ax2.set_ylabel("Critic Rating")
+    ax2.set_xlim(0, 100)
+    ax2.set_ylim(0, 100)
+    ax2.grid(True, alpha=0.3)
+    st.pyplot(fig2)
+    plt.close(fig2)
+
+    corr = ratings.corr(genreMovieData["critic_rating"])
+
+    if pd.isna(corr):
+        st.write("There isn't enough variation in the data to calculate correlation.")
+    else:
+        if corr > 0.3:
+            relationship = "positive"
+        elif corr < -0.3:
+            relationship = "negative"
+        else:
+            relationship = "weak or little"
+
+        st.write(
+            f"The correlation is **{relationship}** "
+            f"(correlation = {corr:.2f})."
+        )
+
+st.divider()
+st.caption("Movie Comparisons | Data analysis with Python and pandas")
