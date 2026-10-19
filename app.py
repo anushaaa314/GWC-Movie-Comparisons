@@ -28,7 +28,7 @@ movieData = movieData.dropna(
 
 st.title("Movie Comparisons")
 st.write(
-    "uses the rotten tomatoes dataset to see how your favorite movie compares with others from the same genere"
+    "Uses the rotten tomatoes dataset to see how your favorite movie compares with others from the same genere"
 )
 
 # Select fav
