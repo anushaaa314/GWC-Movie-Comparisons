@@ -4,23 +4,99 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Movie Comparisons</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 720px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+      line-height: 1.5;
+    }
+    h1 { margin-bottom: 0.25rem; }
+    .subtitle { color: #555; margin-top: 0; }
+    label { font-weight: 600; }
+    input[type="text"] {
+      width: 100%;
+      max-width: 400px;
+      padding: 0.5rem;
+      font-size: 1rem;
+      margin-top: 0.25rem;
+    }
+    button {
+      padding: 0.5rem 1rem;
+      font-size: 1rem;
+      cursor: pointer;
+      margin-top: 0.75rem;
+    }
+    .genre-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin: 1rem 0;
+    }
+    .genre-btn {
+      padding: 0.5rem 1rem;
+      border: 2px solid #333;
+      background: #fff;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.95rem;
+    }
+    .genre-btn:hover {
+      background: #f0f0f0;
+    }
+    .genre-btn.selected {
+      background: #333;
+      color: #fff;
+    }
+    #status {
+      color: #c00;
+      min-height: 1.5em;
+    }
+    #status.info {
+      color: #333;
+    }
+    img {
+      max-width: 100%;
+      height: auto;
+      border: 1px solid #ddd;
+      margin: 0.5rem 0 1.5rem;
+    }
+    .hidden { display: none; }
+    #movie-summary {
+      background: #f7f7f7;
+      padding: 0.75rem 1rem;
+      border-radius: 6px;
+      margin: 1rem 0;
+    }
+  </style>
 </head>
 <body>
   <h1>Movie Comparisons</h1>
-  <p>Compare your favorite movie with other movies in one of its genres.</p>
+  <p class="subtitle">Compare your favorite movie with other movies in one of its genres.</p>
 
-  <form id="movie-form">
-    <label for="movie">What is your favorite movie (before 2020)?</label><br>
-    <input id="movie" name="movie" type="text" required>
-    <br><br>
-    <label for="genre">Which genre would you like to analyze?</label><br>
-    <input id="genre" name="genre" type="text" required>
-    <br><br>
-    <button type="submit">Compare movies</button>
-  </form>
+  <!-- Step 1: enter movie -->
+  <section id="step-movie">
+    <form id="movie-form">
+      <label for="movie">What is your favorite movie (before 2020)?</label><br>
+      <input id="movie" name="movie" type="text" required placeholder="e.g. The Dark Knight">
+      <br>
+      <button type="submit">Find genres</button>
+    </form>
+  </section>
+
+  <!-- Step 2: pick a genre from the movie's list -->
+  <section id="step-genre" class="hidden">
+    <div id="movie-summary"></div>
+    <p><strong>This movie belongs to these genres.</strong> Pick one to compare against:</p>
+    <div id="genre-list" class="genre-list"></div>
+    <button id="back-to-movie" type="button">← Choose a different movie</button>
+  </section>
 
   <p id="status" role="status"></p>
-  <section id="results" hidden>
+
+  <!-- Step 3: results -->
+  <section id="results" class="hidden">
     <h2 id="movie-heading"></h2>
     <p id="movie-details"></p>
     <h2 id="genre-heading"></h2>
@@ -32,25 +108,99 @@
     <p id="correlation"></p>
     <img id="scatterplot" alt="Scatter plot comparing audience ratings and critic ratings">
     <p>Thank you for reading through my data analysis!</p>
+    <button id="start-over" type="button">Start over</button>
   </section>
 
   <script>
-    const form = document.getElementById("movie-form");
-    const status = document.getElementById("status");
+    const movieForm = document.getElementById("movie-form");
+    const stepMovie = document.getElementById("step-movie");
+    const stepGenre = document.getElementById("step-genre");
     const results = document.getElementById("results");
+    const status = document.getElementById("status");
+    const genreList = document.getElementById("genre-list");
+    const movieSummary = document.getElementById("movie-summary");
 
-    form.addEventListener("submit", async (event) => {
+    let currentMovie = null; // stores the title from step 1
+
+    function showStatus(message, isInfo = false) {
+      status.textContent = message;
+      status.className = isInfo ? "info" : "";
+    }
+
+    function clearStatus() {
+      status.textContent = "";
+      status.className = "";
+    }
+
+    function resetToMovieStep() {
+      stepMovie.classList.remove("hidden");
+      stepGenre.classList.add("hidden");
+      results.classList.add("hidden");
+      genreList.innerHTML = "";
+      currentMovie = null;
+      clearStatus();
+    }
+
+    // Step 1: look up movie → show its genres
+    movieForm.addEventListener("submit", async (event) => {
       event.preventDefault();
-      status.textContent = "Analyzing movies...";
-      results.hidden = true;
+      const movieTitle = document.getElementById("movie").value.trim();
+      if (!movieTitle) return;
+
+      showStatus("Looking up movie...", true);
+      results.classList.add("hidden");
+      stepGenre.classList.add("hidden");
+
+      try {
+        const response = await fetch("/api/analyze", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ movie: movieTitle })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Could not find that movie.");
+
+        currentMovie = data.movie.title;
+
+        movieSummary.innerHTML =
+          `<strong>${data.movie.title}</strong> (${data.movie.year})` +
+          `<br>Critic: ${data.movie.critic_rating} · Audience: ${data.movie.audience_rating}`;
+
+        genreList.innerHTML = "";
+        data.available_genres.forEach((genre) => {
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "genre-btn";
+          btn.textContent = genre;
+          btn.addEventListener("click", () => runAnalysis(genre));
+          genreList.appendChild(btn);
+        });
+
+        stepMovie.classList.add("hidden");
+        stepGenre.classList.remove("hidden");
+        clearStatus();
+      } catch (error) {
+        showStatus(error.message);
+      }
+    });
+
+    // Step 2: user clicks a genre → run full analysis
+    async function runAnalysis(genre) {
+      showStatus("Analyzing movies...", true);
+      results.classList.add("hidden");
+
+      // Highlight the selected genre button
+      genreList.querySelectorAll(".genre-btn").forEach((btn) => {
+        btn.classList.toggle("selected", btn.textContent === genre);
+      });
 
       try {
         const response = await fetch("/api/analyze", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            movie: document.getElementById("movie").value.trim(),
-            genre: document.getElementById("genre").value.trim()
+            movie: currentMovie,
+            genre: genre
           })
         });
         const data = await response.json();
@@ -61,21 +211,35 @@
           `Released: ${data.movie.year} | Critic rating: ${data.movie.critic_rating} | Audience rating: ${data.movie.audience_rating} | Genres: ${data.movie.genres}`;
         document.getElementById("genre-heading").textContent =
           `Genre: ${data.genre} (${data.movie_count} movies)`;
-        document.getElementById("statistics").replaceChildren();
+
+        const statsDiv = document.getElementById("statistics");
+        statsDiv.replaceChildren();
         data.statistics.forEach((line) => {
           const p = document.createElement("p");
           p.textContent = line;
-          document.getElementById("statistics").appendChild(p);
+          statsDiv.appendChild(p);
         });
-        document.getElementById("histogram-interpretation").textContent = data.histogram_interpretation;
-        document.getElementById("histogram").src = `data:image/png;base64,${data.histogram_image}`;
-        document.getElementById("correlation").textContent = data.correlation_interpretation;
-        document.getElementById("scatterplot").src = `data:image/png;base64,${data.scatterplot_image}`;
-        results.hidden = false;
-        status.textContent = "";
+
+        document.getElementById("histogram-interpretation").textContent =
+          data.histogram_interpretation;
+        document.getElementById("histogram").src =
+          `data:image/png;base64,${data.histogram_image}`;
+        document.getElementById("correlation").textContent =
+          data.correlation_interpretation;
+        document.getElementById("scatterplot").src =
+          `data:image/png;base64,${data.scatterplot_image}`;
+
+        results.classList.remove("hidden");
+        clearStatus();
       } catch (error) {
-        status.textContent = error.message;
+        showStatus(error.message);
       }
+    }
+
+    document.getElementById("back-to-movie").addEventListener("click", resetToMovieStep);
+    document.getElementById("start-over").addEventListener("click", () => {
+      document.getElementById("movie").value = "";
+      resetToMovieStep();
     });
   </script>
 </body>
