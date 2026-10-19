@@ -21,7 +21,7 @@ def image_to_base64(fig):
     return base64.b64encode(buffer.read()).decode("ascii")
 
 
-def analyze(movie_title, chosen_genre):
+def load_movie_data():
     if not DATA_PATH.exists():
         raise FileNotFoundError(
             "rotten_tomatoes_movies.csv was not found. Add the CSV to the repository root."
@@ -36,13 +36,79 @@ def analyze(movie_title, chosen_genre):
     if missing:
         raise ValueError("The CSV is missing required columns: " + ", ".join(sorted(missing)))
 
-    movie_matches = movie_data[movie_data["movie_title"].astype(str).str.casefold() == movie_title.casefold()]
+    return movie_data
+
+
+def find_movie(movie_data, movie_title):
+    movie_matches = movie_data[
+        movie_data["movie_title"].astype(str).str.casefold() == movie_title.casefold()
+    ]
     if movie_matches.empty:
-        raise ValueError(f'Could not find "{movie_title}" in the movie dataset. Check the spelling.')
-    favorite = movie_matches.iloc[0]
+        raise ValueError(
+            f'Could not find "{movie_title}" in the movie dataset. Check the spelling.'
+        )
+    return movie_matches.iloc[0]
+
+
+def parse_genres(genres_value):
+    """Split a genres string into a clean list of individual genres."""
+    if pd.isna(genres_value) or not str(genres_value).strip():
+        return []
+    return [g.strip() for g in str(genres_value).split(",") if g.strip()]
+
+
+def lookup_movie(movie_title):
+    """Step 1: find the movie and return its basic info + list of genres."""
+    movie_data = load_movie_data()
+    favorite = find_movie(movie_data, movie_title)
 
     if pd.isna(favorite["audience_rating"]):
-        raise ValueError(f'"{movie_title}" does not have an audience rating in the dataset.')
+        raise ValueError(
+            f'"{movie_title}" does not have an audience rating in the dataset.'
+        )
+
+    genres = parse_genres(favorite["genres"])
+    if not genres:
+        raise ValueError(f'"{movie_title}" has no genres listed in the dataset.')
+
+    def safe_value(value):
+        return None if pd.isna(value) else value.item() if hasattr(value, "item") else value
+
+    return {
+        "step": "genres",
+        "movie": {
+            "title": str(favorite["movie_title"]),
+            "year": safe_value(favorite["year"]),
+            "critic_rating": safe_value(favorite["critic_rating"]),
+            "audience_rating": safe_value(favorite["audience_rating"]),
+            "genres": str(favorite["genres"]),
+        },
+        "available_genres": genres,
+    }
+
+
+def analyze(movie_title, chosen_genre):
+    """Step 2: compare the movie against other movies in the chosen genre."""
+    movie_data = load_movie_data()
+    favorite = find_movie(movie_data, movie_title)
+
+    if pd.isna(favorite["audience_rating"]):
+        raise ValueError(
+            f'"{movie_title}" does not have an audience rating in the dataset.'
+        )
+
+    # Make sure the chosen genre actually belongs to this movie
+    movie_genres = parse_genres(favorite["genres"])
+    genre_match = next(
+        (g for g in movie_genres if g.casefold() == chosen_genre.casefold()),
+        None,
+    )
+    if genre_match is None:
+        raise ValueError(
+            f'"{chosen_genre}" is not one of the genres for "{movie_title}". '
+            f'Available genres: {", ".join(movie_genres)}'
+        )
+    chosen_genre = genre_match  # use the canonical spelling from the data
 
     genre_matches = movie_data["genres"].fillna("").astype(str).str.contains(
         chosen_genre, case=False, regex=False
@@ -53,7 +119,9 @@ def analyze(movie_title, chosen_genre):
 
     ratings = pd.to_numeric(genre_movies["audience_rating"], errors="coerce").dropna()
     if ratings.empty:
-        raise ValueError(f'There are no audience ratings available for "{chosen_genre}" movies.')
+        raise ValueError(
+            f'There are no audience ratings available for "{chosen_genre}" movies.'
+        )
 
     favorite_rating = float(favorite["audience_rating"])
     minimum = float(ratings.min())
@@ -63,24 +131,32 @@ def analyze(movie_title, chosen_genre):
 
     stats = [
         f"The minimum audience rating in this genre is: {minimum:g}",
-        f'{movie_title} is rated {favorite_rating - minimum:g} points higher than the lowest-rated movie.',
+        f"{movie_title} is rated {favorite_rating - minimum:g} points higher than the lowest-rated movie.",
         f"The maximum audience rating in this genre is: {maximum:g}",
-        f'{movie_title} is rated {maximum - favorite_rating:g} points lower than the highest-rated movie.',
+        f"{movie_title} is rated {maximum - favorite_rating:g} points lower than the highest-rated movie.",
         f"The mean audience rating in this genre is: {mean:g}",
     ]
 
     if favorite_rating > mean:
-        stats.append(f"{movie_title} is rated {favorite_rating - mean:.2f} points higher than the mean movie rating.")
+        stats.append(
+            f"{movie_title} is rated {favorite_rating - mean:.2f} points higher than the mean movie rating."
+        )
     elif favorite_rating < mean:
-        stats.append(f"{movie_title} is rated {mean - favorite_rating:.2f} points lower than the mean movie rating.")
+        stats.append(
+            f"{movie_title} is rated {mean - favorite_rating:.2f} points lower than the mean movie rating."
+        )
     else:
         stats.append("The rating and mean are equal.")
 
     stats.append(f"The median audience rating in this genre is: {median:g}")
     if favorite_rating > median:
-        stats.append(f"{movie_title} is rated {favorite_rating - median:g} points higher than the median movie rating.")
+        stats.append(
+            f"{movie_title} is rated {favorite_rating - median:g} points higher than the median movie rating."
+        )
     elif favorite_rating < median:
-        stats.append(f"{movie_title} is rated {median - favorite_rating:g} points lower than the median movie rating.")
+        stats.append(
+            f"{movie_title} is rated {median - favorite_rating:g} points lower than the median movie rating."
+        )
     else:
         stats.append("The rating and median are equal.")
 
@@ -98,11 +174,19 @@ def analyze(movie_title, chosen_genre):
     )
     histogram_image = image_to_base64(fig)
 
-    scatter_data = genre_movies[["audience_rating", "critic_rating"]].apply(
-        pd.to_numeric, errors="coerce"
-    ).dropna()
-    if len(scatter_data) >= 2 and scatter_data["audience_rating"].nunique() > 1 and scatter_data["critic_rating"].nunique() > 1:
-        corr = round(float(scatter_data["audience_rating"].corr(scatter_data["critic_rating"])), 2)
+    scatter_data = (
+        genre_movies[["audience_rating", "critic_rating"]]
+        .apply(pd.to_numeric, errors="coerce")
+        .dropna()
+    )
+    if (
+        len(scatter_data) >= 2
+        and scatter_data["audience_rating"].nunique() > 1
+        and scatter_data["critic_rating"].nunique() > 1
+    ):
+        corr = round(
+            float(scatter_data["audience_rating"].corr(scatter_data["critic_rating"])), 2
+        )
     else:
         corr = None
 
@@ -117,8 +201,9 @@ def analyze(movie_title, chosen_genre):
         else:
             relationship = "no"
         correlation_interpretation = (
-            "According to the scatter plot, there is " + relationship +
-            " correlation between audience ratings and critic ratings "
+            "According to the scatter plot, there is "
+            + relationship
+            + " correlation between audience ratings and critic ratings "
             f"(correlation = {corr})."
         )
 
@@ -136,12 +221,13 @@ def analyze(movie_title, chosen_genre):
         return None if pd.isna(value) else value.item() if hasattr(value, "item") else value
 
     return {
+        "step": "analysis",
         "movie": {
             "title": str(favorite["movie_title"]),
             "year": safe_value(favorite["year"]),
             "critic_rating": safe_value(favorite["critic_rating"]),
             "audience_rating": safe_value(favorite["audience_rating"]),
-            "genres": str(favorite["genres"])
+            "genres": str(favorite["genres"]),
         },
         "genre": chosen_genre,
         "movie_count": int(len(genre_movies)),
@@ -149,7 +235,7 @@ def analyze(movie_title, chosen_genre):
         "histogram_interpretation": histogram_interpretation,
         "histogram_image": histogram_image,
         "correlation_interpretation": correlation_interpretation,
-        "scatterplot_image": scatterplot_image
+        "scatterplot_image": scatterplot_image,
     }
 
 
@@ -161,10 +247,17 @@ class handler(BaseHTTPRequestHandler):
             movie = str(payload.get("movie", "")).strip()
             genre = str(payload.get("genre", "")).strip()
 
-            if not movie or not genre:
-                self.send_json(400, {"error": "Enter both a movie title and a genre."})
+            if not movie:
+                self.send_json(400, {"error": "Enter a movie title."})
                 return
 
+            # Step 1: only movie → return available genres
+            if not genre:
+                result = lookup_movie(movie)
+                self.send_json(200, result)
+                return
+
+            # Step 2: movie + genre → full analysis
             result = analyze(movie, genre)
             self.send_json(200, result)
         except FileNotFoundError as exc:
@@ -172,10 +265,12 @@ class handler(BaseHTTPRequestHandler):
         except ValueError as exc:
             self.send_json(400, {"error": str(exc)})
         except Exception:
-            self.send_json(500, {"error": "An unexpected error occurred while analyzing the data."})
+            self.send_json(
+                500, {"error": "An unexpected error occurred while analyzing the data."}
+            )
 
     def do_GET(self):
-        self.send_json(405, {"error": "Use POST to analyze a movie."})
+        self.send_json(405, {"error": "Use POST to look up a movie or run an analysis."})
 
     def send_json(self, status, payload):
         body = json.dumps(payload, allow_nan=False, default=str).encode("utf-8")
