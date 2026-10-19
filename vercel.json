@@ -1,3 +1,4 @@
+
 {
   "builds": [
     {
@@ -11,11 +12,7 @@
   ],
   "routes": [
     {
-      "src": "/api/movies",
-      "dest": "/api/analyze.py"
-    },
-    {
-      "src": "/api/analyze",
+      "src": "/api/(.*)",
       "dest": "/api/analyze.py"
     },
     {
