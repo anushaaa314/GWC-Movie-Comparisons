@@ -4,16 +4,15 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 
 st.set_page_config(
-    page_title="Movie Comparisons",
-    page_icon="🎬",
+    page_title="movie comparisons",
+    page_icon="",
     layout="wide"
 )
 
-# Load your existing dataset
-data_path = Path(__file__).parent / "rotten_tomatoes_movies.csv"
-movieData = pd.read_csv(data_path)
+#Load Dataset
+movieData = pd.read_csv('./rotten_tomatoes_movies.csv')
 
-# Prepare the columns used for analysis
+# Prepare columns
 movieData["year"] = pd.to_numeric(movieData["year"], errors="coerce")
 movieData["audience_rating"] = pd.to_numeric(
     movieData["audience_rating"], errors="coerce"
@@ -27,13 +26,12 @@ movieData = movieData.dropna(
             "audience_rating", "critic_rating"]
 )
 
-st.title("🎬 Movie Comparisons")
+st.title("Movie Comparisons")
 st.write(
-    "Explore how your favorite movie compares with other "
-    "movies in its genre using Rotten Tomatoes ratings."
+    "uses the rotten tomatoes dataset to see how your favorite movie compares with others from the same genere"
 )
 
-# Select a favorite movie released before 2020
+# Select fav
 eligible = movieData[movieData["year"] < 2020]
 
 if eligible.empty:
@@ -59,7 +57,7 @@ c3.metric("Audience Rating", f'{favData["audience_rating"]:.1f}%')
 
 st.write("**Genres:**", favData["genres"])
 
-# Let the user select one of the movie's genres
+# Select genre
 genres = sorted({
     genre.strip()
     for genre in str(favData["genres"]).split(",")
@@ -75,7 +73,7 @@ chosenGenre = st.selectbox(
     genres
 )
 
-# Match the selected genre as a complete genre name
+# Match as complete name
 genreMovieData = eligible[
     eligible["genres"].apply(
         lambda value: chosenGenre in [
