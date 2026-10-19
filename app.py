@@ -48,7 +48,7 @@ favMovie = st.selectbox(
 favData = eligible[eligible["movie_title"] == favMovie].iloc[0]
 
 # Display movie information
-st.subheader(f"some info aabout {favMovie}")
+st.subheader(f"Here is some info about {favMovie}")
 
 c1, c2, c3 = st.columns(3)
 c1.metric("Release Year", int(favData["year"]))
