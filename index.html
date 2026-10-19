@@ -1,272 +1,77 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Movie Comparisons</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      max-width: 800px;
-      margin: 40px auto;
-      padding: 0 20px;
-      line-height: 1.6;
-    }
-
-    input, select, button {
-      font: inherit;
-      padding: 10px;
-      margin-top: 8px;
-      box-sizing: border-box;
-    }
-
-    input, select {
-      width: 100%;
-    }
-
-    button {
-      cursor: pointer;
-    }
-
-    #suggestions {
-      border: 1px solid #ccc;
-      margin-top: 4px;
-      max-height: 220px;
-      overflow-y: auto;
-    }
-
-    .suggestion {
-      display: block;
-      width: 100%;
-      text-align: left;
-      border: none;
-      background: white;
-      padding: 10px;
-      margin: 0;
-    }
-
-    .suggestion:hover, .suggestion:focus {
-      background: #eee;
-    }
-
-    img {
-      max-width: 100%;
-      height: auto;
-    }
-
-    [hidden] {
-      display: none !important;
-    }
-  </style>
 </head>
 <body>
   <h1>Movie Comparisons</h1>
   <p>Compare your favorite movie with other movies in one of its genres.</p>
 
-  <section id="movie-step">
-    <form id="movie-form">
-      <label for="movie">What is your favorite movie (before 2020)?</label>
-      <input
-        id="movie"
-        name="movie"
-        type="text"
-        placeholder="Start typing a movie title..."
-        autocomplete="off"
-        required
-      >
-
-      <div id="suggestions" hidden></div>
-      <p id="movie-status" role="status"></p>
-
-      <button type="submit">Continue</button>
-    </form>
-  </section>
-
-  <section id="genre-step" hidden>
-    <h2 id="selected-movie"></h2>
-
-    <form id="genre-form">
-      <label for="genre">Which genre would you like to analyze?</label>
-      <input
-        id="genre"
-        name="genre"
-        type="text"
-        placeholder="For example, Comedy or Drama"
-        required
-      >
-      <p>Enter a genre that appears in your selected movie's genre list.</p>
-      <button type="submit">Compare Movies</button>
-      <button type="button" id="back-button">Choose Another Movie</button>
-    </form>
-  </section>
+  <form id="movie-form">
+    <label for="movie">What is your favorite movie (before 2020)?</label><br>
+    <input id="movie" name="movie" type="text" required>
+    <br><br>
+    <label for="genre">Which genre would you like to analyze?</label><br>
+    <input id="genre" name="genre" type="text" required>
+    <br><br>
+    <button type="submit">Compare movies</button>
+  </form>
 
   <p id="status" role="status"></p>
-
   <section id="results" hidden>
     <h2 id="movie-heading"></h2>
     <p id="movie-details"></p>
     <h2 id="genre-heading"></h2>
     <div id="statistics"></div>
-
     <h2>Audience Ratings Histogram</h2>
     <p id="histogram-interpretation"></p>
-    <img id="histogram" alt="Histogram of audience ratings">
-
+    <img id="histogram" alt="Histogram of audience ratings for the selected genre">
     <h2>Audience Rating vs. Critic Rating</h2>
     <p id="correlation"></p>
-    <img id="scatterplot" alt="Scatter plot comparing audience and critic ratings">
-
+    <img id="scatterplot" alt="Scatter plot comparing audience ratings and critic ratings">
     <p>Thank you for reading through my data analysis!</p>
   </section>
 
   <script>
-    const movieForm = document.getElementById("movie-form");
-    const genreForm = document.getElementById("genre-form");
-    const movieInput = document.getElementById("movie");
-    const genreInput = document.getElementById("genre");
-    const suggestions = document.getElementById("suggestions");
-    const movieStatus = document.getElementById("movie-status");
+    const form = document.getElementById("movie-form");
     const status = document.getElementById("status");
+    const results = document.getElementById("results");
 
-    let selectedMovie = "";
-    let searchNumber = 0;
-    let suggestionTitles = [];
-
-    // Find matching movie titles as the user types.
-    movieInput.addEventListener("input", async () => {
-      const query = movieInput.value.trim();
-      const thisSearch = ++searchNumber;
-
-      selectedMovie = "";
-      suggestions.replaceChildren();
-      suggestions.hidden = true;
-      movieStatus.textContent = "";
-
-      if (query.length < 1) return;
-
-      try {
-        const response = await fetch(
-          "/api/movies?q=" + encodeURIComponent(query)
-        );
-        const data = await response.json();
-
-        // Ignore results from an older search.
-        if (thisSearch !== searchNumber) return;
-
-        if (!response.ok) {
-          throw new Error(data.error || "Could not load movie suggestions.");
-        }
-
-        suggestionTitles = data.movies || [];
-
-        if (suggestionTitles.length === 0) {
-          movieStatus.textContent = "No matching movies found.";
-          return;
-        }
-
-        suggestionTitles.forEach((title) => {
-          const option = document.createElement("button");
-          option.type = "button";
-          option.className = "suggestion";
-          option.textContent = title;
-
-          option.addEventListener("click", () => {
-            movieInput.value = title;
-            selectedMovie = title;
-            suggestions.hidden = true;
-            suggestions.replaceChildren();
-            movieStatus.textContent = "Selected: " + title;
-          });
-
-          suggestions.appendChild(option);
-        });
-
-        suggestions.hidden = false;
-      } catch (error) {
-        if (thisSearch === searchNumber) {
-          movieStatus.textContent = error.message;
-        }
-      }
-    });
-
-    // Validate the movie before showing the genre question.
-    movieForm.addEventListener("submit", (event) => {
+    form.addEventListener("submit", async (event) => {
       event.preventDefault();
-
-      if (!selectedMovie || movieInput.value.trim() !== selectedMovie) {
-        movieStatus.textContent =
-          "Please choose a movie from the dropdown suggestions.";
-        return;
-      }
-
-      document.getElementById("selected-movie").textContent =
-        "Selected movie: " + selectedMovie;
-
-      document.getElementById("movie-step").hidden = true;
-      document.getElementById("genre-step").hidden = false;
-      document.getElementById("results").hidden = true;
-      status.textContent = "";
-      genreInput.focus();
-    });
-
-    document.getElementById("back-button").addEventListener("click", () => {
-      document.getElementById("genre-step").hidden = true;
-      document.getElementById("movie-step").hidden = false;
-      genreInput.value = "";
-      movieInput.focus();
-    });
-
-    // Analyze the selected movie after the user submits a genre.
-    genreForm.addEventListener("submit", async (event) => {
-      event.preventDefault();
-
       status.textContent = "Analyzing movies...";
-      document.getElementById("results").hidden = true;
+      results.hidden = true;
 
       try {
         const response = await fetch("/api/analyze", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            movie: selectedMovie,
-            genre: genreInput.value.trim()
+            movie: document.getElementById("movie").value.trim(),
+            genre: document.getElementById("genre").value.trim()
           })
         });
-
         const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data.error || "The analysis could not be completed.");
-        }
+        if (!response.ok) throw new Error(data.error || "The analysis could not be completed.");
 
         document.getElementById("movie-heading").textContent = data.movie.title;
         document.getElementById("movie-details").textContent =
           `Released: ${data.movie.year} | Critic rating: ${data.movie.critic_rating} | Audience rating: ${data.movie.audience_rating} | Genres: ${data.movie.genres}`;
-
         document.getElementById("genre-heading").textContent =
           `Genre: ${data.genre} (${data.movie_count} movies)`;
-
-        const statistics = document.getElementById("statistics");
-        statistics.replaceChildren();
-
+        document.getElementById("statistics").replaceChildren();
         data.statistics.forEach((line) => {
           const p = document.createElement("p");
           p.textContent = line;
-          statistics.appendChild(p);
+          document.getElementById("statistics").appendChild(p);
         });
-
-        document.getElementById("histogram-interpretation").textContent =
-          data.histogram_interpretation;
-        document.getElementById("histogram").src =
-          `data:image/png;base64,${data.histogram_image}`;
-
-        document.getElementById("correlation").textContent =
-          data.correlation_interpretation;
-        document.getElementById("scatterplot").src =
-          `data:image/png;base64,${data.scatterplot_image}`;
-
-        document.getElementById("results").hidden = false;
+        document.getElementById("histogram-interpretation").textContent = data.histogram_interpretation;
+        document.getElementById("histogram").src = `data:image/png;base64,${data.histogram_image}`;
+        document.getElementById("correlation").textContent = data.correlation_interpretation;
+        document.getElementById("scatterplot").src = `data:image/png;base64,${data.scatterplot_image}`;
+        results.hidden = false;
         status.textContent = "";
       } catch (error) {
         status.textContent = error.message;
