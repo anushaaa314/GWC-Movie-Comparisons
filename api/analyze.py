@@ -8,7 +8,6 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd
-from urllib.parse import urlparse, parse_qs
 
 
 DATA_PATH = Path(__file__).resolve().parent.parent / "rotten_tomatoes_movies.csv"
@@ -176,60 +175,6 @@ class handler(BaseHTTPRequestHandler):
             self.send_json(500, {"error": "An unexpected error occurred while analyzing the data."})
 
     def do_GET(self):
-    request_path = urlparse(self.path)
-
-    if request_path.path == "/api/movies":
-        try:
-            query = parse_qs(request_path.query).get("q", [""])[0].strip()
-
-            if not query:
-                self.send_json(200, {"movies": []})
-                return
-
-            if not DATA_PATH.exists():
-                raise FileNotFoundError(
-                    "rotten_tomatoes_movies.csv was not found."
-                )
-
-            movie_data = pd.read_csv(
-                DATA_PATH,
-                usecols=["movie_title"]
-            )
-
-            titles = (
-                movie_data["movie_title"]
-                .dropna()
-                .astype(str)
-                .drop_duplicates()
-            )
-
-            matches = titles[
-                titles.str.contains(query, case=False, regex=False)
-            ]
-
-            # Show titles starting with the query before other matches.
-            starts_with = matches[
-                matches.str.casefold().str.startswith(query.casefold())
-            ]
-            other_matches = matches[
-                ~matches.str.casefold().str.startswith(query.casefold())
-            ]
-
-            results = (
-                starts_with.head(10).tolist()
-                + other_matches.head(10).tolist()
-            )[:10]
-
-            self.send_json(200, {"movies": results})
-
-        except FileNotFoundError as exc:
-            self.send_json(500, {"error": str(exc)})
-        except Exception:
-            self.send_json(
-                500,
-                {"error": "Could not load movie suggestions."}
-            )
-    else:
         self.send_json(405, {"error": "Use POST to analyze a movie."})
 
     def send_json(self, status, payload):
